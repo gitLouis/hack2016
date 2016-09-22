@@ -8,6 +8,7 @@ import numpy
 
 from geopy.distance import great_circle
 from os.path import expanduser
+import numpy.linalg as lin
 try:
    import cPickle as pickle
 except:
@@ -101,7 +102,10 @@ def createGraph(ship_row):
         else:
             G.add_edge(from_port, to_port, duration=edge_durations[i], distance=edge_distance, count=1)
 
-
+    for u, v, d in G.edges(data=True):
+        avg_duration = d['duration'] /d['count']
+        avg_distance = d['distance'] /d['count']
+        G.add_edge(from_port, to_port, duration=avg_duration, distance=avg_distance, count=cum_count)
     return multiG, G
 
 
@@ -121,7 +125,18 @@ data_per_vessel['num_of_port_visits'] = data_per_vessel['port_visits_row'].apply
 ship_graphs = dict()
 
 for index, row in data_per_vessel.iterrows():
-    ship_graphs[index] = createGraph(row);
+    multiG, G = createGraph(row);
+
+    multiG_numpy = networkx.to_numpy_matrix (multiG)
+    P, D, Q = numpy.linalg.svd(multiG_numpy, full_matrices=False)
+    d_multi = numpy.diag(D)
+
+    multiG_numpy = networkx.to_numpy_matrix (G)
+    P, D, Q = numpy.linalg.svd(multiG_numpy, full_matrices=False)
+    d = numpy.diag(D)
+
+    ship_graphs[index]
+
 
 # data_per_vessel['num_of_port_visits'] = data_per_vessel['port_visits_row'].apply(lambda x: (len(x) if type(x) is tuple else 0))
 
