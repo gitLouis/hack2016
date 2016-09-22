@@ -5,6 +5,7 @@ import pandas
 import networkx
 from datetime import datetime, timedelta
 import numpy
+
 from geopy.distance import great_circle
 from os.path import expanduser
 try:
@@ -30,7 +31,7 @@ print('loading data from pickle file...')
 meetings_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\meetings_train.p", "rb" ) )
 port_visits_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\port_visits_train_raw.p", "rb" ) )
 vessels_labels_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\vessels_labels_train_raw.p", "rb" ) )
-meetings_train_raw['port_id'] = meetings_train_raw['Lat'].apply(lambda x: str(int(round(x)))) + meetings_train_raw['Long'].apply(    lambda x: str(int(round(x))))
+#meetings_train_raw['port_id'] = meetings_train_raw['Lat'].apply(lambda x: str(int(round(x)))) + meetings_train_raw['Long'].apply(    lambda x: str(int(round(x))))
 
 #create sample data
 # meetings_train_raw = meetings_train_raw[0:1000]
