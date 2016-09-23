@@ -5,6 +5,8 @@ import pandas
 import networkx
 from datetime import datetime, timedelta
 import numpy
+import scipy
+import time
 
 from geopy.distance import great_circle
 from os.path import expanduser
@@ -32,7 +34,7 @@ print('loading data from pickle file...')
 meetings_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\meetings_train.p", "rb" ) )
 port_visits_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\port_visits_train_raw.p", "rb" ) )
 vessels_labels_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\vessels_labels_train_raw.p", "rb" ) )
-#meetings_train_raw['port_id'] = meetings_train_raw['Lat'].apply(lambda x: str(int(round(x)))) + meetings_train_raw['Long'].apply(    lambda x: str(int(round(x))))
+meetings_train_raw['port_id'] = meetings_train_raw['Lat'].apply(lambda x: str(int(round(x)))) + meetings_train_raw['Long'].apply(    lambda x: str(int(round(x))))
 
 #create sample data
 # meetings_train_raw = meetings_train_raw[0:1000]
@@ -105,7 +107,7 @@ def createGraph(ship_row):
     for u, v, d in G.edges(data=True):
         avg_duration = d['duration'] /d['count']
         avg_distance = d['distance'] /d['count']
-        G.add_edge(from_port, to_port, duration=avg_duration, distance=avg_distance, count=cum_count)
+        G.add_edge(from_port, to_port, duration=avg_duration, distance=avg_distance, count=d['count'])
     return multiG, G
 
 
@@ -123,84 +125,41 @@ data_per_vessel['num_of_meetings'] = data_per_vessel['meeting_id1_row'].apply(le
 data_per_vessel['num_of_port_visits'] = data_per_vessel['port_visits_row'].apply(len )
 
 ship_graphs = dict()
+ship_eigs = dict()
 
-for index, row in data_per_vessel.iterrows():
+for index, row in data_per_vessel.iloc[range(1,100)].iterrows():
     multiG, G = createGraph(row);
 
-    multiG_numpy = networkx.to_numpy_matrix (multiG)
-    P, D, Q = numpy.linalg.svd(multiG_numpy, full_matrices=False)
-    d_multi = numpy.diag(D)
+#    multiG_numpy = networkx.to_numpy_matrix (multiG)
+#    P, D, Q = numpy.linalg.svd(multiG_numpy, full_matrices=False)
+#    d_multi = numpy.diag(D)
 
-    multiG_numpy = networkx.to_numpy_matrix (G)
-    P, D, Q = numpy.linalg.svd(multiG_numpy, full_matrices=False)
-    d = numpy.diag(D)
+    # tic = time.time()
+    # G_numpy = networkx.to_numpy_matrix (G)
+    # P, D, Q = numpy.linalg.svd(G_numpy, full_matrices=False)
+    # d = numpy.diag(D)
+    # print('Numpu timing: ' + time.time() - tic )
 
-    ship_graphs[index]
+    tic = time.time()
+    G = G.to_undirected()
+    G_sparse = networkx.adjacency_matrix(G, weight='distance')
+    _,a,_ = scipy.sparse.linalg.svds(G_sparse, k = 10)
+    print('scipy timing: ' + str(time.time() - tic) )
+    # P, D, Q = numpy.linalg.svd(G_numpy, full_matrices=False)
+    # d = numpy.diag(D)
+    # print('Numpu timing: ' + time.time() - tic )
 
+    G = G.to_undirected()
+    tic = time.time()
+    b = networkx.adjacency_spectrum(G, weight='distance')
+    print('Networkx timing: ' + str(time.time() - tic) )
 
-# data_per_vessel['num_of_port_visits'] = data_per_vessel['port_visits_row'].apply(lambda x: (len(x) if type(x) is tuple else 0))
+    ship_graphs[index] = G
+    ship_eigs[index] = a
 
-meetings_train_sample = meetings_train_raw[0:100]
-port_visits_train_sample = port_visits_train_raw[0:100]
+pickle.dump()
+pickle.dump()
 
-
-c = pandas.Series.unique(meetings_train_sample['ves_id1'])
-
-
-
-labels = vessels_labels_train_raw.loc[c]
-
-
-print(labels[0:5])
-
-
-# In[111]:
-
-meeting_arr = labels.apply(lambda x: list(meetings_train_raw.loc[(meetings_train_raw['ves_id1']==x[0]) | (meetings_train_raw['ves_id2']==x[0])]))
-
-
-# In[112]:
-
-meeting_arr.head()
-
-
-# In[87]:
-
-labels.head(1)
-
-
-
-print(labels)
-
-len(labels)
-
-
-# In[26]:
-
-
-
-
-# In[78]:
-
-type(meeting_arr)
-
-
-# In[25]:
-
-result = c.join(vessels_labels_train_raw, on='ves_id1')
-
-
-# In[14]:
-
-print(meetings_train_raw[0:5])
-
-
-# In[19]:
-
-print(vessels_labels_train_raw[0:5])
-
-
-# In[ ]:
 
 
 
