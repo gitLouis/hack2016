@@ -17,10 +17,18 @@ PLACEHOLDER = 0
 
 
 home = expanduser("~")
+
+# load training set
 data_per_vessel = pickle.load (open( home+"\\Dropbox\\Sea Snails\\preproc data\\data_per_vessel_lists2.p", "rb" ) )
 meetings_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\meetings_train.p", "rb" ) )
 port_visits_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\port_visits_train_raw.p", "rb" ) )
 vessels_labels_train_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\raw data\\vessels_labels_train_raw.p", "rb" ) )
+
+# load test set
+data_per_vessel_test = pickle.load (open( home+"\\Dropbox\\Sea Snails\\preproc data\\test_data_per_vessel.p", "rb" ) )
+meetings_test_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\test data\\meetings_test.p", "rb" ) )
+port_visits_test_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\test data\\port_visits_test.p", "rb" ) )
+vessels_labels_test_raw = pickle.load( open( home+"\\Dropbox\\Sea Snails\\test data\\vessels_to_label.p", "rb" ) )
 
 ship_type_by_port_id = pickle.load( open( home+"\\Dropbox\\Sea Snails\\feature data\\ship_type_by_port_id_prob.p", "rb" ) )
 ship_type_by_port_country = pickle.load( open( home+"\\Dropbox\\Sea Snails\\feature data\\ship_type_by_port_country.p", "rb" ) )
@@ -38,14 +46,14 @@ port_indicative_countries = list(port_indicative_countries['country'])
 
 
 small_dataset_size = 10000
-test_set_size = 1000
+test_set_size = 0
 validation_n = 10
 
 
 #----------------------------Feature Repository-------------------------------------
 
 
-def port_id_probs(args):
+def port_id_probs(args): #
     port_visits = port_visits_train_raw.loc[args['port_visits_row']]
     port_probs = ship_type_by_port_id.loc[port_visits['port_id']]
     feature = port_probs.sum() / len(port_probs) if len(port_probs) >0  else  port_probs.sum()
@@ -70,7 +78,7 @@ def num_country_visits(args):
     country = pd.get_dummies(port_visits['country'])
     return country.sum()
 
-def main_country_weight(args):
+def main_country_weight(args): #
     port_visits = port_visits_train_raw.loc[args['port_visits_row']]
     port_visits = port_visits[pd.notnull(port_visits['country'])]
     country = pd.get_dummies(port_visits['country'])
@@ -103,6 +111,19 @@ def visit_in_country(args, country):
     return pd.Series([int(country in meetings['country'].values)], index=['been in' + country])
 
 
+#---------------------------------Test features ------------------------------------------
+def main_country_weight_test(args): #
+    port_visits = port_visits_test_raw.loc[args['port_visits_row']]
+    port_visits = port_visits[pd.notnull(port_visits['country'])]
+    country = pd.get_dummies(port_visits['country'])
+    feature = country.sum().max() / len(port_visits) if len(port_visits) > 0 else 0
+    return pd.Series([feature],index=['main_country_weight'])
+
+def port_id_probs_test(args): #
+    port_visits = port_visits_test_raw.loc[args['port_visits_row']]
+    port_probs = ship_type_by_port_id.loc[port_visits['port_id']]
+    feature = port_probs.sum() / len(port_probs) if len(port_probs) >0  else  port_probs.sum()
+    return feature
 #---------------------------------Learning Methods----------------------------------------
 
 def classify_with_PCA(clf, train_set, train_labels, test_set, test_labels ):
@@ -140,7 +161,7 @@ def generate_feature_table(dataset, feature_funcs, normalize=False):
     return full_table
 
 #----------------------------------The script---------------------------------------------
-small_data = data_per_vessel[1:small_dataset_size]
+small_data = data_per_vessel
 country_funcs = []
 visit_funcs = []
 
@@ -152,23 +173,25 @@ for v in range(5):
     visit_func = lambda x : visit_in_country(x, port_indicative_countries[v])
     visit_funcs.append(visit_func)
 
-funcs = [port_id_probs, main_country_weight] + country_funcs + visit_funcs
-feature_table = generate_feature_table(small_data, funcs)
-train_set = feature_table[1:-test_set_size]
-train_labels = small_data['type'].iloc[1:-test_set_size]
+funcs = [port_id_probs, main_country_weight]
+test_funcs = [port_id_probs_test, main_country_weight_test]
+feature_table_train = generate_feature_table(small_data, funcs)
+feature_table_test = generate_feature_table(data_per_vessel_test, funcs)
 
 
-test_set = feature_table[-test_set_size:]
-test_labels = small_data['type'].iloc[-test_set_size:]
+train_set = feature_table_train
+train_labels = small_data['type'].iloc[1:]
+
+
+test_set = feature_table_test
+
 
 #clf = svm.SVC()
 clf = KNeighborsClassifier(n_neighbors=10)
-if not np.all(np.isfinite(train_set)):
-        pass
+
 clf.fit(train_set, train_labels)
 result  =  clf.predict(test_set)
 
-accuracies = np.zeros((validation_n))
 
 
 
